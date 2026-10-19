@@ -20,7 +20,7 @@ Start the local server:
 .\.venv\Scripts\python.exe -m uvicorn emabox.main:app --env-file .env --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for the interactive request schema. `GET /health` needs no key. Other requests require the `X-API-Key` header. Use HTTPS when the service is deployed.
+Open `http://127.0.0.1:8000/docs` for the interactive request schema. `GET /health` needs no key. Other requests require the `X-API-Key` header. **Enter an application key from `EMABOX_API_CLIENTS` here, not your Gemini or OpenAI provider key.** The provider key stays inside Emabox and is used only for outbound model calls. Use HTTPS when the service is deployed.
 
 ## Request contract
 

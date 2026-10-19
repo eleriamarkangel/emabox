@@ -78,7 +78,16 @@ def create_app(
 
     app = FastAPI(title="Emabox AI API", version="0.1.0", lifespan=lifespan)
 
-    def authenticate(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> tuple[str, ClientConfig]:
+    def authenticate(
+        x_api_key: str | None = Header(
+            default=None,
+            alias="X-API-Key",
+            description=(
+                "Emabox application key from EMABOX_API_CLIENTS. "
+                "This is separate from your Gemini or OpenAI provider key."
+            ),
+        ),
+    ) -> tuple[str, ClientConfig]:
         if x_api_key is None:
             raise HTTPException(status_code=401, detail="Invalid application API key")
         for app_id, client in settings.clients.items():
