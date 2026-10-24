@@ -46,11 +46,30 @@ class Provider(Protocol):
 
 
 class GeminiProvider:
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, *, max_output_tokens: int = 512,
+                 thinking_level: str | None = None, temperature: float | None = None):
         from google import genai
 
         self.client = genai.Client(api_key=api_key)
         self.model = model
+        self.max_output_tokens = max_output_tokens
+        self.thinking_level = thinking_level
+        self.temperature = temperature
+
+    def _config(self, instructions: str, max_output_tokens: int):
+        from google.genai import types
+
+        options = {
+            "system_instruction": instructions,
+            "max_output_tokens": min(max_output_tokens, self.max_output_tokens),
+        }
+        if self.thinking_level is not None:
+            options["thinking_config"] = types.ThinkingConfig(
+                thinking_level=self.thinking_level.upper(),
+            )
+        if self.temperature is not None:
+            options["temperature"] = self.temperature
+        return types.GenerateContentConfig(**options)
 
     @staticmethod
     def _contents(messages: list[Message]) -> list[dict]:
@@ -95,10 +114,7 @@ class GeminiProvider:
         result = await self.client.aio.models.generate_content(
             model=self.model,
             contents=self._contents(messages),
-            config=types.GenerateContentConfig(
-                system_instruction=instructions,
-                max_output_tokens=max_output_tokens,
-            ),
+            config=self._config(instructions, max_output_tokens),
         )
         return Completion(text=result.text or "", usage=self._usage(result.usage_metadata))
 
@@ -111,10 +127,7 @@ class GeminiProvider:
         chunks = await self.client.aio.models.generate_content_stream(
             model=self.model,
             contents=self._contents(messages),
-            config=types.GenerateContentConfig(
-                system_instruction=instructions,
-                max_output_tokens=max_output_tokens,
-            ),
+            config=self._config(instructions, max_output_tokens),
         )
         usage = Usage()
         async for chunk in chunks:
@@ -207,5 +220,10 @@ class OpenAIProvider:
 def create_provider(settings: Settings) -> Provider:
     settings.validate_ready()
     if settings.provider == "gemini":
-        return GeminiProvider(settings.gemini_api_key or "", settings.gemini_model)
+        return GeminiProvider(
+            settings.gemini_api_key or "", settings.gemini_model,
+            max_output_tokens=settings.gemini_max_output_tokens,
+            thinking_level=settings.gemini_thinking_level,
+            temperature=settings.gemini_temperature,
+        )
     return OpenAIProvider(settings.openai_api_key or "", settings.openai_model)

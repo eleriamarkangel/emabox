@@ -25,10 +25,25 @@ class Settings:
     openai_model: str
     database_url: str
     clients: dict[str, ClientConfig]
-    log_retention_days: int = 40
+    log_retention_days: int = 60
     generic_max_input_tokens: int = 1200
     generic_max_output_tokens: int = 256
     specialist_max_output_tokens: int = 1200
+    gemini_max_output_tokens: int = 512
+    gemini_thinking_level: str | None = None
+    gemini_temperature: float | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("generic_max_input_tokens", "generic_max_output_tokens",
+                     "specialist_max_output_tokens", "gemini_max_output_tokens"):
+            if getattr(self, name) < 1:
+                raise ValueError(f"{name} must be positive")
+        if self.gemini_thinking_level not in {None, "minimal", "low", "medium", "high"}:
+            raise ValueError("EMABOX_GEMINI_THINKING_LEVEL must be minimal, low, medium, high, or blank")
+        if self.gemini_temperature is not None and not 0 <= self.gemini_temperature <= 2:
+            raise ValueError("EMABOX_GEMINI_TEMPERATURE must be between 0 and 2")
+        if self.gemini_thinking_level and not self.gemini_model.startswith("gemini-3"):
+            raise ValueError("EMABOX_GEMINI_THINKING_LEVEL requires a Gemini 3 model; leave blank for other models")
 
     @property
     def model(self) -> str:
@@ -55,7 +70,7 @@ class Settings:
                 raise ValueError(f"Invalid default_specialist for {app_id}")
             clients[app_id] = ClientConfig(key=key, default_specialist=default)
 
-        retention = int(os.getenv("EMABOX_LOG_RETENTION_DAYS", "40"))
+        retention = int(os.getenv("EMABOX_LOG_RETENTION_DAYS", "60"))
         if retention < 1:
             raise ValueError("EMABOX_LOG_RETENTION_DAYS must be positive")
         return cls(
@@ -67,6 +82,13 @@ class Settings:
             database_url=os.getenv("EMABOX_DATABASE_URL", "sqlite:///./emabox.db"),
             clients=clients,
             log_retention_days=retention,
+            generic_max_input_tokens=int(os.getenv("EMABOX_GENERIC_MAX_INPUT_TOKENS", "1200")),
+            generic_max_output_tokens=int(os.getenv("EMABOX_GENERIC_MAX_OUTPUT_TOKENS", "256")),
+            specialist_max_output_tokens=int(os.getenv("EMABOX_SPECIALIST_MAX_OUTPUT_TOKENS", "1200")),
+            gemini_max_output_tokens=int(os.getenv("EMABOX_GEMINI_MAX_OUTPUT_TOKENS", "512")),
+            gemini_thinking_level=os.getenv("EMABOX_GEMINI_THINKING_LEVEL", "").strip().lower() or None,
+            gemini_temperature=(float(os.environ["EMABOX_GEMINI_TEMPERATURE"])
+                                if os.getenv("EMABOX_GEMINI_TEMPERATURE", "").strip() else None),
         )
 
     def validate_ready(self) -> None:

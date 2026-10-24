@@ -50,7 +50,7 @@ def make_app(tmp_path, provider=None):
             "other": ClientConfig("other-key-12345678"),
         },
     )
-    audit = AuditStore(settings.database_url, 40)
+    audit = AuditStore(settings.database_url, settings.log_retention_days)
     return create_app(settings, provider, audit), provider, audit
 
 
@@ -136,12 +136,12 @@ def test_retention_removes_old_metadata(tmp_path):
     with TestClient(app):
         with Session(audit.engine) as session:
             session.add(AuditRow(
-                request_id="old", created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=41),
+                request_id="old", created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=61),
                 app_id="other", specialist="generic", provider="gemini", model="test",
                 streamed=False, status="ok", latency_ms=1,
             ))
             session.add(AuditRow(
-                request_id="recent", created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=39),
+                request_id="recent", created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=59),
                 app_id="other", specialist="generic", provider="gemini", model="test",
                 streamed=False, status="ok", latency_ms=1,
             ))

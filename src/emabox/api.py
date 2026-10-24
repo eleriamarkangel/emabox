@@ -9,6 +9,7 @@ import secrets
 import time
 import uuid
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -55,6 +56,11 @@ def create_app(
         await asyncio.to_thread(audit_store.create)
         app.state.provider = model_provider
         app.state.audit = audit_store
+        app.state.web_provider = provider or (create_provider(replace(
+            settings, provider="gemini", gemini_max_output_tokens=2048,
+            gemini_thinking_level="low" if settings.gemini_model.startswith("gemini-3") else None,
+            gemini_temperature=None,
+        )) if settings.gemini_api_key else None)
         stop = asyncio.Event()
 
         async def periodic_purge() -> None:
@@ -74,6 +80,8 @@ def create_app(
             stop.set()
             await purge_task
             await model_provider.close()
+            if app.state.web_provider is not None and app.state.web_provider is not model_provider:
+                await app.state.web_provider.close()
             await asyncio.to_thread(audit_store.close)
 
     app = FastAPI(title="Emabox AI API", version="0.1.0", lifespan=lifespan)
@@ -218,4 +226,6 @@ def create_app(
                       "output_tokens": result.usage.output_tokens},
         })
 
+    from .web import install_web
+    install_web(app, settings)
     return app
